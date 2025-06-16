@@ -1,43 +1,55 @@
-#!/usr/bin/env python3 from selenium import webdriver from selenium.webdriver.chrome.options import Options from selenium.common.exceptions import WebDriverException import concurrent.futures import time
+#!/usr/bin/env python3 import time import concurrent.futures import undetected_chromedriver as uc from selenium.webdriver.chrome.options import Options from selenium.common.exceptions import WebDriverException from datetime import datetime import json
 
-MAX_WORKERS = 20 TIMEOUT = 15  # Detik TEST_URL = "https://httpbin.org/ip"
+MAX_WORKERS = 10 TIMEOUT = 20 TEST_URL = "https://httpbin.org/ip" LOG_FILE = "validation_log.json"
 
-def load_proxies(): try: with open('proxies_raw.txt') as f: return list(set(line.strip() for line in f if line.strip())) except FileNotFoundError: print("❌ File proxies_raw.txt tidak ditemukan.") return []
+def load_proxies(): try: with open("proxies_raw.txt") as f: return list(set(line.strip() for line in f if line.strip())) except FileNotFoundError: print("❌ File proxies_raw.txt tidak ditemukan.") return []
 
-def test_proxy(proxy): chrome_options = Options() chrome_options.add_argument('--headless') chrome_options.add_argument('--disable-gpu') chrome_options.add_argument('--no-sandbox') chrome_options.add_argument(f'--proxy-server=http://{proxy}')
+def log_result(proxy, status, reason=""): entry = { "proxy": proxy, "status": status, "timestamp": datetime.utcnow().isoformat(), "reason": reason } with open(LOG_FILE, "a") as logf: logf.write(json.dumps(entry) + "\n")
+
+def test_proxy(proxy): options = uc.ChromeOptions() options.add_argument("--headless") options.add_argument("--no-sandbox") options.add_argument("--disable-gpu") options.add_argument(f"--proxy-server=http://{proxy}")
 
 try:
-    driver = webdriver.Chrome(options=chrome_options)
+    driver = uc.Chrome(options=options, use_subprocess=True)
     driver.set_page_load_timeout(TIMEOUT)
     driver.get(TEST_URL)
-    page = driver.page_source
+    if "origin" in driver.page_source:
+        result = proxy
+        log_result(proxy, "active")
+    else:
+        result = None
+        log_result(proxy, "invalid", "no origin in page")
     driver.quit()
-    return proxy if "origin" in page else None
-except WebDriverException:
+    return result
+except WebDriverException as e:
+    log_result(proxy, "error", str(e))
     return None
 
 def validate_proxies(): proxies = load_proxies() if not proxies: return 0
 
-print(f"🔍 Memulai validasi turbo dengan Selenium ({len(proxies)} proxy) menggunakan {MAX_WORKERS} thread...\n")
+print(f"🔍 Memulai validasi expert mode ({len(proxies)} proxy) dengan {MAX_WORKERS} thread...\n")
 start = time.time()
 valid = []
 
 with concurrent.futures.ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
     futures = {executor.submit(test_proxy, proxy): proxy for proxy in proxies}
     for future in concurrent.futures.as_completed(futures):
-        result = future.result()
         proxy = futures[future]
-        if result:
-            print(f"\033[92m✅ Aktif: {proxy}\033[0m")
-            valid.append(proxy)
-        else:
-            print(f"\033[91m⛔ Gagal: {proxy}\033[0m")
+        try:
+            result = future.result()
+            if result:
+                print(f"\033[92m✅ Aktif: {proxy}\033[0m")
+                valid.append(proxy)
+            else:
+                print(f"\033[91m⛔ Gagal: {proxy}\033[0m")
+        except Exception as e:
+            print(f"\033[91m⛔ Exception: {proxy} - {e}\033[0m")
+            log_result(proxy, "exception", str(e))
 
-with open('proxies_valid.txt', 'w') as f:
+with open("proxies_valid.txt", "w") as f:
     for proxy in valid:
-        f.write(proxy + '\n')
+        f.write(proxy + "\n")
 
-print(f"\n✅ Validasi selesai. Total proxy aktif: {len(valid)} / {len(proxies)}")
+print(f"\n✅ Validasi selesai. Proxy aktif: {len(valid)} / {len(proxies)}")
 print(f"⏱️ Durasi: {time.time() - start:.2f} detik\n")
 return len(valid)
 
