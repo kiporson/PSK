@@ -1,43 +1,54 @@
 #!/usr/bin/env python3
 import requests
+import concurrent.futures
+import time
 
-# ✅ Validator Proxy untuk DIABLO_CLICK_ENGINE (Stabil & Responsif)
-def validate_proxies() -> int:
-    """Cek proxies dari proxies_raw.txt dan simpan yang aktif."""
+MAX_WORKERS = 50  # Thread paralel
+TIMEOUT = 5       # Timeout per request
+
+def load_proxies():
     try:
         with open('proxies_raw.txt') as f:
-            raw_proxies = [p.strip() for p in f if p.strip()]
+            return list(set(line.strip() for line in f if line.strip()))
     except FileNotFoundError:
         print("❌ File proxies_raw.txt tidak ditemukan.")
+        return []
+
+def test_proxy(proxy):
+    proxies = {'http': f'http://{proxy}', 'https': f'http://{proxy}'}
+    try:
+        r = requests.get('http://httpbin.org/ip', proxies=proxies, timeout=TIMEOUT)
+        if r.status_code == 200:
+            return proxy
+    except:
+        return None
+
+def validate_proxies():
+    proxies = load_proxies()
+    if not proxies:
         return 0
 
-    good = []
-    max_test = 100
-    print(f"🔍 Memulai validasi maksimal {min(len(raw_proxies), max_test)} proxy...\n")
+    print(f"🔍 Memulai validasi turbo ({len(proxies)} proxy) dengan {MAX_WORKERS} thread...\n")
+    start = time.time()
+    valid = []
 
-    for i, proxy in enumerate(raw_proxies):
-        if i >= max_test:
-            break
-        proxies = {'http': proxy, 'https': proxy}
-        try:
-            print(f"🌐 Menguji: {proxy}")
-            r = requests.get('http://httpbin.org/ip', proxies=proxies, timeout=3)
-            if r.status_code == 200:
-                print(f"✅ Aktif: {proxy}")
-                good.append(proxy)
+    with concurrent.futures.ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
+        futures = {executor.submit(test_proxy, p): p for p in proxies}
+        for future in concurrent.futures.as_completed(futures):
+            result = future.result()
+            if result:
+                print(f"\033[92m✅ Aktif: {result}\033[0m")
+                valid.append(result)
             else:
-                print(f"⛔ Gagal ({r.status_code}): {proxy}")
-        except Exception:
-            print(f"⛔ Timeout/Error: {proxy}")
-            continue
+                print(f"\033[91m⛔ Gagal: {futures[future]}\033[0m")
 
     with open('proxies_valid.txt', 'w') as f:
-        for p in good:
-            f.write(p + '\n')
+        for proxy in valid:
+            f.write(proxy + '\n')
 
-    print(f"\n✅ Validasi selesai. Total proxy aktif: {len(good)}\n")
-    return len(good)
-
+    print(f"\n✅ Validasi selesai. Total proxy aktif: {len(valid)} / {len(proxies)}")
+    print(f"⏱️ Durasi: {time.time() - start:.2f} detik\n")
+    return len(valid)
 
 if __name__ == "__main__":
     validate_proxies()
