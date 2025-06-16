@@ -1,99 +1,52 @@
 #!/usr/bin/env python3
+import asyncio
+import httpx
 import time
-import os
-import json
-import concurrent.futures
-from datetime import datetime
-import undetected_chromedriver as uc
-from selenium.webdriver.chrome.options import Options
-from selenium.common.exceptions import WebDriverException
 
-MAX_WORKERS = 10
-TIMEOUT = 20
 TEST_URL = "https://httpbin.org/ip"
-LOG_FILE = "validation_log.json"
+MAX_CONCURRENT = 200
+TIMEOUT = 10
 
-# Path ke chromedriver (pastikan file ini bisa dieksekusi)
-CHROMEDRIVER_PATH = os.path.expanduser("~/.local/share/undetected_chromedriver/chromedriver")
-if not os.path.exists(CHROMEDRIVER_PATH):
-    CHROMEDRIVER_PATH = None  # fallback jika path tidak valid
+async def check_proxy(proxy: str, client: httpx.AsyncClient) -> str:
+    try:
+        proxies = {
+            "http://": f"http://{proxy}",
+            "https://": f"http://{proxy}",
+        }
+        resp = await client.get(TEST_URL, proxies=proxies, timeout=TIMEOUT)
+        if resp.status_code == 200 and "origin" in resp.text:
+            print(f"\033[92m✅ VALID: {proxy}\033[0m")
+            return proxy
+    except:
+        pass
+    print(f"\033[91m⛔ INVALID: {proxy}\033[0m")
+    return None
 
-def load_proxies():
+async def validate_all():
     try:
         with open("proxies_raw.txt") as f:
-            return list(set(line.strip() for line in f if line.strip()))
+            raw_proxies = [line.strip() for line in f if line.strip()]
     except FileNotFoundError:
         print("❌ File proxies_raw.txt tidak ditemukan.")
-        return []
-
-def log_result(proxy, status, reason=""):
-    entry = {
-        "proxy": proxy,
-        "status": status,
-        "timestamp": datetime.utcnow().isoformat(),
-        "reason": reason
-    }
-    with open(LOG_FILE, "a") as logf:
-        logf.write(json.dumps(entry) + "\n")
-
-def test_proxy(proxy):
-    options = uc.ChromeOptions()
-    options.add_argument("--headless")
-    options.add_argument("--no-sandbox")
-    options.add_argument("--disable-gpu")
-    options.add_argument(f"--proxy-server=http://{proxy}")
-
-    try:
-        driver = uc.Chrome(
-            options=options,
-            use_subprocess=True,
-            driver_executable_path=CHROMEDRIVER_PATH
-        )
-        driver.set_page_load_timeout(TIMEOUT)
-        driver.get(TEST_URL)
-        if "origin" in driver.page_source:
-            log_result(proxy, "active")
-            driver.quit()
-            return proxy
-        else:
-            log_result(proxy, "invalid", "no origin in page")
-            driver.quit()
-            return None
-    except WebDriverException as e:
-        log_result(proxy, "error", str(e))
-        return None
-
-def validate_proxies():
-    proxies = load_proxies()
-    if not proxies:
         return 0
 
-    print(f"🔍 Memulai validasi expert mode ({len(proxies)} proxy) dengan {MAX_WORKERS} thread...\n")
-    start = time.time()
-    valid = []
+    connector = httpx.AsyncHTTPTransport(retries=1)
+    async with httpx.AsyncClient(http2=True, transport=connector) as client:
+        tasks = []
+        for proxy in raw_proxies:
+            tasks.append(check_proxy(proxy, client))
+        results = await asyncio.gather(*tasks)
 
-    with concurrent.futures.ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
-        futures = {executor.submit(test_proxy, proxy): proxy for proxy in proxies}
-        for future in concurrent.futures.as_completed(futures):
-            proxy = futures[future]
-            try:
-                result = future.result()
-                if result:
-                    print(f"\033[92m✅ Aktif: {proxy}\033[0m")
-                    valid.append(proxy)
-                else:
-                    print(f"\033[91m⛔ Gagal: {proxy}\033[0m")
-            except Exception as e:
-                print(f"\033[91m⛔ Exception: {proxy} - {e}\033[0m")
-                log_result(proxy, "exception", str(e))
-
+    valid = [r for r in results if r]
     with open("proxies_valid.txt", "w") as f:
-        for proxy in valid:
-            f.write(proxy + "\n")
+        for p in valid:
+            f.write(p + "\n")
 
-    print(f"\n✅ Validasi selesai. Proxy aktif: {len(valid)} / {len(proxies)}")
-    print(f"⏱️ Durasi: {time.time() - start:.2f} detik\n")
+    print(f"\n✅ Total proxy valid: {len(valid)} dari {len(raw_proxies)}")
     return len(valid)
 
-if __name__ == "__main__":
-    validate_proxies()
+def validate_proxies():
+    start = time.time()
+    valid_count = asyncio.run(validate_all())
+    print(f"⏱️ Durasi validasi: {time.time() - start:.2f} detik")
+    return valid_count
