@@ -7,7 +7,7 @@ TEST_URL = "https://httpbin.org/ip"
 MAX_CONCURRENT = 200
 TIMEOUT = 10
 
-async def check_proxy(proxy: str, client: httpx.AsyncClient) -> str:
+async def check_proxy(proxy: str, client: httpx.AsyncClient) -> str | None:
     try:
         proxies = {
             "http://": f"http://{proxy}",
@@ -17,12 +17,12 @@ async def check_proxy(proxy: str, client: httpx.AsyncClient) -> str:
         if resp.status_code == 200 and "origin" in resp.text:
             print(f"\033[92m✅ VALID: {proxy}\033[0m")
             return proxy
-    except:
+    except Exception:
         pass
     print(f"\033[91m⛔ INVALID: {proxy}\033[0m")
     return None
 
-async def validate_all():
+async def validate_all() -> int:
     try:
         with open("proxies_raw.txt") as f:
             raw_proxies = [line.strip() for line in f if line.strip()]
@@ -31,10 +31,8 @@ async def validate_all():
         return 0
 
     connector = httpx.AsyncHTTPTransport(retries=1)
-    async with httpx.AsyncClient(http2=True, transport=connector) as client:
-        tasks = []
-        for proxy in raw_proxies:
-            tasks.append(check_proxy(proxy, client))
+    async with httpx.AsyncClient(http2=False, transport=connector) as client:
+        tasks = [check_proxy(proxy, client) for proxy in raw_proxies]
         results = await asyncio.gather(*tasks)
 
     valid = [r for r in results if r]
@@ -45,7 +43,7 @@ async def validate_all():
     print(f"\n✅ Total proxy valid: {len(valid)} dari {len(raw_proxies)}")
     return len(valid)
 
-def validate_proxies():
+def validate_proxies() -> int:
     start = time.time()
     valid_count = asyncio.run(validate_all())
     print(f"⏱️ Durasi validasi: {time.time() - start:.2f} detik")
