@@ -1,54 +1,45 @@
-#!/usr/bin/env python3
-import requests
-import concurrent.futures
-import time
+#!/usr/bin/env python3 from selenium import webdriver from selenium.webdriver.chrome.options import Options from selenium.common.exceptions import WebDriverException import concurrent.futures import time
 
-MAX_WORKERS = 50  # Thread paralel
-TIMEOUT = 5       # Timeout per request
+MAX_WORKERS = 20 TIMEOUT = 15  # Detik TEST_URL = "https://httpbin.org/ip"
 
-def load_proxies():
-    try:
-        with open('proxies_raw.txt') as f:
-            return list(set(line.strip() for line in f if line.strip()))
-    except FileNotFoundError:
-        print("❌ File proxies_raw.txt tidak ditemukan.")
-        return []
+def load_proxies(): try: with open('proxies_raw.txt') as f: return list(set(line.strip() for line in f if line.strip())) except FileNotFoundError: print("❌ File proxies_raw.txt tidak ditemukan.") return []
 
-def test_proxy(proxy):
-    proxies = {'http': f'http://{proxy}', 'https': f'http://{proxy}'}
-    try:
-        r = requests.get('http://httpbin.org/ip', proxies=proxies, timeout=TIMEOUT)
-        if r.status_code == 200:
-            return proxy
-    except:
-        return None
+def test_proxy(proxy): chrome_options = Options() chrome_options.add_argument('--headless') chrome_options.add_argument('--disable-gpu') chrome_options.add_argument('--no-sandbox') chrome_options.add_argument(f'--proxy-server=http://{proxy}')
 
-def validate_proxies():
-    proxies = load_proxies()
-    if not proxies:
-        return 0
+try:
+    driver = webdriver.Chrome(options=chrome_options)
+    driver.set_page_load_timeout(TIMEOUT)
+    driver.get(TEST_URL)
+    page = driver.page_source
+    driver.quit()
+    return proxy if "origin" in page else None
+except WebDriverException:
+    return None
 
-    print(f"🔍 Memulai validasi turbo ({len(proxies)} proxy) dengan {MAX_WORKERS} thread...\n")
-    start = time.time()
-    valid = []
+def validate_proxies(): proxies = load_proxies() if not proxies: return 0
 
-    with concurrent.futures.ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
-        futures = {executor.submit(test_proxy, p): p for p in proxies}
-        for future in concurrent.futures.as_completed(futures):
-            result = future.result()
-            if result:
-                print(f"\033[92m✅ Aktif: {result}\033[0m")
-                valid.append(result)
-            else:
-                print(f"\033[91m⛔ Gagal: {futures[future]}\033[0m")
+print(f"🔍 Memulai validasi turbo dengan Selenium ({len(proxies)} proxy) menggunakan {MAX_WORKERS} thread...\n")
+start = time.time()
+valid = []
 
-    with open('proxies_valid.txt', 'w') as f:
-        for proxy in valid:
-            f.write(proxy + '\n')
+with concurrent.futures.ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
+    futures = {executor.submit(test_proxy, proxy): proxy for proxy in proxies}
+    for future in concurrent.futures.as_completed(futures):
+        result = future.result()
+        proxy = futures[future]
+        if result:
+            print(f"\033[92m✅ Aktif: {proxy}\033[0m")
+            valid.append(proxy)
+        else:
+            print(f"\033[91m⛔ Gagal: {proxy}\033[0m")
 
-    print(f"\n✅ Validasi selesai. Total proxy aktif: {len(valid)} / {len(proxies)}")
-    print(f"⏱️ Durasi: {time.time() - start:.2f} detik\n")
-    return len(valid)
+with open('proxies_valid.txt', 'w') as f:
+    for proxy in valid:
+        f.write(proxy + '\n')
 
-if __name__ == "__main__":
-    validate_proxies()
+print(f"\n✅ Validasi selesai. Total proxy aktif: {len(valid)} / {len(proxies)}")
+print(f"⏱️ Durasi: {time.time() - start:.2f} detik\n")
+return len(valid)
+
+if name == "main": validate_proxies()
+
