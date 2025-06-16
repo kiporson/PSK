@@ -1,62 +1,73 @@
 #!/usr/bin/env python3
 import os
-import random
 import time
-import requests
-from stealth import get_headers
+import random
+from selenium import webdriver
+from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.common.by import By
+from selenium.common.exceptions import WebDriverException
+from fake_useragent import UserAgent
 
 LOG_FILE = 'log.txt'
 
-def load_proxies() -> list:
-    """Muat proxy valid dari file."""
+def load_proxies():
     if not os.path.exists('proxies_valid.txt'):
         return []
     with open('proxies_valid.txt') as f:
-        return [p.strip() for p in f if p.strip()]
+        return [x.strip() for x in f if x.strip()]
 
-def load_useragents() -> list:
-    """Muat daftar user-agent dari file."""
-    if not os.path.exists('useragents.txt'):
-        return []
-    with open('useragents.txt') as f:
-        return [ua.strip() for ua in f if ua.strip()]
+def init_browser(proxy=None, user_agent=None):
+    options = Options()
+    options.add_argument("--headless=new")
+    options.add_argument("--disable-blink-features=AutomationControlled")
+    options.add_argument("--no-sandbox")
+    options.add_argument("--disable-dev-shm-usage")
+    if user_agent:
+        options.add_argument(f"user-agent={user_agent}")
+    if proxy:
+        options.add_argument(f'--proxy-server={proxy}')
+    try:
+        driver = webdriver.Chrome(options=options)
+    except Exception as e:
+        print(f"❌ Gagal inisialisasi Chrome: {e}")
+        return None
+    return driver
 
-def click_links(links: list) -> None:
-    """Kunjungi tiap link menggunakan proxy dan user-agent acak."""
+def click_links(links: list):
     proxies = load_proxies()
-    user_agents = load_useragents()
+    ua = UserAgent()
+    os.makedirs("screenshots", exist_ok=True)
 
-    if not user_agents:
-        print('❌ File useragents.txt kosong!')
-        return
-    if not links:
-        print('❌ Tidak ada link untuk diklik!')
-        return
+    for i, url in enumerate(links, 1):
+        print(f"🔗 [{i}/{len(links)}] Mengunjungi: {url}")
+        proxy = random.choice(proxies) if proxies else None
+        user_agent = ua.random
 
-    with open(LOG_FILE, 'a') as log:
-        for i, url in enumerate(links, 1):
-            proxy = random.choice(proxies) if proxies else None
-            ua = random.choice(user_agents)
-            headers = get_headers(ua)
-            proxy_dict = {'http': proxy, 'https': proxy} if proxy else None
+        print(f"🌐 Proxy: {proxy or 'None'}")
+        print(f"🧠 User-Agent: {user_agent[:80]}...")
 
-            print(f"🔗 [{i}/{len(links)}] Mengunjungi: {url}")
-            print(f"🌐 Proxy: {proxy or 'Koneksi langsung'}")
-            print(f"🧠 User-Agent: {ua[:70]}...")
+        driver = init_browser(proxy, user_agent)
+        if not driver:
+            continue
 
-            try:
-                r = requests.get(url, headers=headers, proxies=proxy_dict, timeout=10, allow_redirects=True)
-                print(f"✅ Status: {r.status_code} | Redirect: {r.url}\n")
-                log.write(f"{time.asctime()} SUCCESS {url} via {proxy} status:{r.status_code}\n")
-            except Exception as e:
-                print(f"⛔ Gagal via proxy: {e}")
+        try:
+            driver.get(url)
+            time.sleep(5)  # bisa disesuaikan jika loading lambat
+            status = driver.execute_script("return document.readyState")
+            if status != "complete":
+                raise WebDriverException("Halaman tidak selesai dimuat")
+
+            # Screenshot untuk debug (opsional)
+            screenshot_path = f'screenshots/page_{i}.png'
+            driver.save_screenshot(screenshot_path)
+
+            print(f"✅ Berhasil akses halaman (Screenshot: {screenshot_path})")
+            with open(LOG_FILE, 'a') as log:
+                log.write(f"{time.asctime()} OK {url} via {proxy} [screenshot: {screenshot_path}]\n")
+
+        except Exception as e:
+            print(f"⛔ Gagal via proxy: {e}")
+            with open(LOG_FILE, 'a') as log:
                 log.write(f"{time.asctime()} ERROR {url} via {proxy} reason:{e}\n")
-                # 🔁 Coba ulang pakai koneksi langsung
-                try:
-                    print("🔁 Mencoba ulang tanpa proxy...")
-                    r = requests.get(url, headers=headers, timeout=10, allow_redirects=True)
-                    print(f"✅ Status (direct): {r.status_code} | Redirect: {r.url}\n")
-                    log.write(f"{time.asctime()} SUCCESS {url} via DIRECT status:{r.status_code}\n")
-                except Exception as e2:
-                    print(f"⛔ Tetap gagal tanpa proxy: {e2}\n")
-                    log.write(f"{time.asctime()} ERROR {url} via DIRECT reason:{e2}\n")
+        finally:
+            driver.quit()
