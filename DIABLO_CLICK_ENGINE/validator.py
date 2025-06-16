@@ -1,6 +1,9 @@
 #!/usr/bin/env python3 import time import concurrent.futures import undetected_chromedriver as uc from selenium.webdriver.chrome.options import Options from selenium.common.exceptions import WebDriverException from datetime import datetime import json import os
 
-MAX_WORKERS = 10 TIMEOUT = 20 TEST_URL = "https://httpbin.org/ip" LOG_FILE = "validation_log.json"
+MAX_WORKERS = 10
+TIMEOUT = 20
+TEST_URL = "https://httpbin.org/ip"
+LOG_FILE = "validation_log.json"
 
 CHROMEDRIVER_PATH = os.path.expanduser("~/.local/share/undetected_chromedriver/chromedriver")
 
