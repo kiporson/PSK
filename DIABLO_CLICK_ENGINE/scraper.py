@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import requests
 import time
+import re
 from typing import List
 
 # Daftar sumber proxy HTTP publik
@@ -12,6 +13,9 @@ SOURCES: List[str] = [
     'https://www.proxyscan.io/download?type=http',
     'https://spys.me/proxy.txt',
 ]
+
+# Regex untuk mendeteksi format IP:PORT
+PROXY_REGEX = re.compile(r'^\d{1,3}(\.\d{1,3}){3}:\d{2,5}$')
 
 def scrape_proxies() -> None:
     """Scrape proxies dari berbagai sumber publik dan simpan ke proxies_raw.txt"""
@@ -30,7 +34,7 @@ def scrape_proxies() -> None:
 
             for line in response.text.splitlines():
                 proxy = line.strip()
-                if proxy.count(':') == 1:
+                if PROXY_REGEX.match(proxy):
                     proxies.add(proxy)
             print(f"✅ Total sementara: {len(proxies)} proxy valid.")
 
