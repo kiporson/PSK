@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Display colored ASCII banner with statistics."""
+"""Tampilan banner DIABLO_CLICK_ENGINE dengan ASCII, statistik, dan petunjuk."""
 
 from pyfiglet import Figlet
 
@@ -7,9 +7,11 @@ from pyfiglet import Figlet
 RED = "\033[91m"
 CYAN = "\033[96m"
 GREEN = "\033[92m"
-BLUE = "\033[94m"
+YELLOW = "\033[93m"
+MAGENTA = "\033[95m"
 WHITE = "\033[97m"
 RESET = "\033[0m"
+BOLD = "\033[1m"
 
 SKULL = r'''
       .ed""" """$$$be.
@@ -26,16 +28,18 @@ SKULL = r'''
 
 
 def show_banner(valid: int, total: int, ip: str, durasi: float) -> None:
-    """Print skull, DIABLO text and usage instructions."""
+    """Cetak tampilan skull + judul DIABLO dan informasi statistik bot."""
     fig = Figlet(font="slant")
     diablo_text = fig.renderText("DIABLO")
 
     print(f"{RED}{SKULL}{RESET}")
-    print(f"{CYAN}{diablo_text}{RESET}")
-    print(f"{BLUE}IP Lokal : {ip}{RESET}")
-    print(f"{BLUE}Durasi   : {durasi:.2f}s{RESET}")
-    print(f"{BLUE}Proxy OK : {valid}/{total}{RESET}")
-    print(f"{GREEN}BOT READY{RESET}\n")
-    print(f"{WHITE}jalankan: bash start.sh{RESET}")
-    print(f"{WHITE}masukkan link satu per satu kemudian ketik 'DONE'{RESET}\n")
+    print(f"{MAGENTA}{diablo_text}{RESET}")
 
+    print(f"{BOLD}{CYAN}🔹 IP Lokal  : {WHITE}{ip}{RESET}")
+    print(f"{BOLD}{CYAN}⏱️  Durasi    : {WHITE}{durasi:.2f} detik{RESET}")
+    print(f"{BOLD}{CYAN}🌐 Proxy OK : {WHITE}{valid}/{total}{RESET}")
+    print(f"{BOLD}{GREEN}✅ BOT SIAP JALAN!{RESET}\n")
+
+    print(f"{YELLOW}📌 Ketik {BOLD}bash start.sh{RESET}{YELLOW} untuk memulai ulang bot jika perlu.")
+    print(f"🔗 Masukkan link shortlink satu per satu lalu ketik '{BOLD}DONE{RESET}{YELLOW}'.")
+    print(f"📥 Contoh: {WHITE}https://shortlink.com/abc123{RESET}\n")
