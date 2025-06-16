@@ -1,3 +1,27 @@
+#!/usr/bin/env python3
+import os
+import random
+import time
+import requests
+from stealth import get_headers
+
+LOG_FILE = 'log.txt'
+
+
+def load_proxies() -> list:
+    """Load validated proxies from file."""
+    if not os.path.exists('proxies_valid.txt'):
+        return []
+    with open('proxies_valid.txt') as f:
+        return [p.strip() for p in f if p.strip()]
+
+
+def load_useragents() -> list:
+    """Load user-agents from file."""
+    with open('useragents.txt') as f:
+        return [ua.strip() for ua in f if ua.strip()]
+
+
 def click_links(links: list) -> None:
     """Request each link using random proxy and user-agent, with real-time output."""
     proxies = load_proxies()
