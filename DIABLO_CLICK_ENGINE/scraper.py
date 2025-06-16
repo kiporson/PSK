@@ -1,42 +1,35 @@
-#!/usr/bin/env python3
-import requests
-import time
+#!/usr/bin/env python3 import requests import time from typing import List
 
-# Daftar sumber proxy HTTP publik
-SOURCES = [
-    'https://raw.githubusercontent.com/TheSpeedX/PROXY-List/master/http.txt',
-    'https://raw.githubusercontent.com/ShiftyTR/Proxy-List/master/http.txt',
-    'https://api.proxyscrape.com/v2/?request=displayproxies&protocol=http&timeout=10000&country=all',
-    'https://www.proxy-list.download/api/v1/get?type=http',
-    'https://www.proxyscan.io/download?type=http',
-    'https://spys.me/proxy.txt',
-]
+Daftar sumber proxy HTTP publik
 
-def scrape_proxies() -> None:
-    """Scrape proxies dari berbagai sumber publik dan simpan ke proxies_raw.txt"""
-    proxies = set()
-    print("🌐 Mengambil proxy dari sumber publik...")
+SOURCES: List[str] = [ 'https://raw.githubusercontent.com/TheSpeedX/PROXY-List/master/http.txt', 'https://raw.githubusercontent.com/ShiftyTR/Proxy-List/master/http.txt', 'https://api.proxyscrape.com/v2/?request=displayproxies&protocol=http&timeout=10000&country=all', 'https://www.proxy-list.download/api/v1/get?type=http', 'https://www.proxyscan.io/download?type=http', 'https://spys.me/proxy.txt', ]
 
-    for i, url in enumerate(SOURCES, start=1):
-        print(f"🔗 [{i}/{len(SOURCES)}] Fetching: {url}")
-        try:
-            response = requests.get(url, timeout=10, headers={
-                "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/115.0.0.0 Safari/537.36"
-            })
-            if response.status_code == 200:
-                for line in response.text.splitlines():
-                    line = line.strip()
-                    if ':' in line and len(line.split(':')) == 2:
-                        proxies.add(line)
-                print(f"✅ Berhasil ambil {len(proxies)} proxy sejauh ini.")
-            else:
-                print(f"⛔ Gagal (kode HTTP {response.status_code})")
-        except Exception as e:
-            print(f"⚠️ Gagal ambil dari {url}: {e}")
-        time.sleep(1.5)  # Delay ringan biar gak dianggap spam
+def scrape_proxies() -> None: """Scrape proxies dari berbagai sumber publik dan simpan ke proxies_raw.txt""" proxies = set() print("🌐 Mengambil proxy dari sumber publik...")
 
-    with open('proxies_raw.txt', 'w') as f:
-        for p in sorted(proxies):
-            f.write(p + '\n')
+headers = {
+    "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/115.0.0.0 Safari/537.36"
+}
 
-    print(f"\n💾 Total proxy terkumpul: {len(proxies)}")
+for i, url in enumerate(SOURCES, start=1):
+    print(f"🔗 [{i}/{len(SOURCES)}] Fetching: {url}")
+    try:
+        response = requests.get(url, timeout=10, headers=headers)
+        response.raise_for_status()
+
+        for line in response.text.splitlines():
+            proxy = line.strip()
+            if proxy.count(':') == 1:
+                proxies.add(proxy)
+        print(f"✅ Total sementara: {len(proxies)} proxy valid.")
+
+    except requests.exceptions.RequestException as e:
+        print(f"⚠️ Gagal ambil dari {url}: {e}")
+
+    time.sleep(1.0)  # Jeda ringan agar tidak terblokir
+
+with open('proxies_raw.txt', 'w') as f:
+    for proxy in sorted(proxies):
+        f.write(proxy + '\n')
+
+print(f"\n💾 Total proxy terkumpul: {len(proxies)}")
+
