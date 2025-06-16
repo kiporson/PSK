@@ -7,7 +7,7 @@ LOG_FILE = "validation_log.json"
 
 CHROMEDRIVER_PATH = os.path.expanduser("~/.local/share/undetected_chromedriver/chromedriver")
 
-Pastikan path valid atau berikan fallback
+# Pastikan path valid atau berikan fallback
 
 if not os.path.exists(CHROMEDRIVER_PATH): CHROMEDRIVER_PATH = None
 
