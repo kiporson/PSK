@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
+import os
 import requests
+
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 # List of proxy sources providing plain text IP:PORT per line
 SOURCES = [
@@ -22,7 +25,7 @@ def scrape_proxies() -> None:
                         proxies.add(line)
         except Exception:
             pass
-    with open('proxies_raw.txt', 'w') as f:
+    with open(os.path.join(BASE_DIR, 'proxies_raw.txt'), 'w') as f:
         for p in sorted(proxies):
             f.write(p + '\n')
     return None
