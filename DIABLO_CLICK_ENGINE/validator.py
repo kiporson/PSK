@@ -7,6 +7,7 @@ from concurrent.futures import ThreadPoolExecutor
 PROXY_FILE = "proxies.txt"
 VALID_FILE = "valid_proxies.txt"
 MAX_WORKERS = 20
+MAX_VALID = 1000
 TEST_URL = "http://icanhazip.com"
 
 def validate_proxy(proxy):
@@ -31,24 +32,29 @@ def save_valid_proxies(valid_list):
         for proxy in valid_list:
             f.write(proxy + "\n")
 
-def validate_all():
+def validate_all(max_valid=MAX_VALID):
     proxies = load_proxies()
     if not proxies:
         print("⚠️ Tidak ada proxy untuk divalidasi.")
         return
 
-    print(f"\n🔎 Memvalidasi {len(proxies)} proxy...")
+    print(f"\n🔎 Memvalidasi hingga {max_valid} proxy valid dari {len(proxies)} total...")
+
     valid = []
     invalid_count = 0
     checked_count = 0
-    start = time.time()
     lock = threading.Lock()
+    start = time.time()
 
     def check(proxy):
-        nonlocal invalid_count, checked_count
+        nonlocal checked_count, invalid_count
+        # Cegah validasi berlebihan
+        if len(valid) >= max_valid:
+            return
         if validate_proxy(proxy):
             with lock:
-                valid.append(proxy)
+                if len(valid) < max_valid:
+                    valid.append(proxy)
         else:
             with lock:
                 invalid_count += 1
@@ -56,7 +62,7 @@ def validate_all():
             checked_count += 1
 
     def progress():
-        while checked_count < len(proxies):
+        while checked_count < len(proxies) and len(valid) < max_valid:
             with lock:
                 print(f"\r⏳ Valid: {len(valid)} | Gagal: {invalid_count}", end='', flush=True)
             time.sleep(0.2)
@@ -71,8 +77,8 @@ def validate_all():
     save_valid_proxies(valid)
 
     durasi = round(time.time() - start, 2)
-    print(f"\r🎯 Selesai! ✅ {len(valid)} valid | ❌ {invalid_count} gagal | ⏱️ {durasi}s\n")
+    print(f"\r🎯 Validasi selesai! ✅ {len(valid)} valid | ❌ {invalid_count} gagal | ⏱️ {durasi}s\n")
 
 if __name__ == "__main__":
-    print("🚀 VALIDATOR MODE: TENANG & CEPAT")
+    print("🚀 VALIDATOR MODE: OTOMATIS MAX 1000 VALID")
     validate_all()
