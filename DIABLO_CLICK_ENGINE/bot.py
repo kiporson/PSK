@@ -3,7 +3,7 @@ import os
 import time
 import requests
 from scraper import scrape_proxies
-from validator import validate_proxies
+from validator import validate_all
 from banner import show_banner
 from clicker import click_links
 
@@ -12,6 +12,13 @@ def check_resources() -> None:
     for filename in ['proxies_raw.txt', 'proxies_valid.txt', 'log.txt', 'useragents.txt']:
         open(filename, 'a').close()
     os.makedirs('links', exist_ok=True)
+
+def count_valid_proxies():
+    try:
+        with open('proxies_valid.txt') as f:
+            return len([line for line in f if line.strip()])
+    except FileNotFoundError:
+        return 0
 
 def main():
     check_resources()
@@ -28,7 +35,9 @@ def main():
         total = 0
 
     print("🧪 Mulai validasi proxy...")
-    valid = validate_proxies()
+    validate_all()  # jalankan validasi
+    valid = count_valid_proxies()  # hitung hasil valid
+
     duration = time.time() - start
 
     # Ambil IP publik
