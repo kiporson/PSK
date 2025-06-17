@@ -7,11 +7,21 @@ from validator import validate_all
 from banner import show_banner
 from clicker import click_links
 
+# Pastikan file penting tersedia
 def check_resources():
     for filename in ['proxies_raw.txt', 'proxies_valid.txt', 'log.txt', 'useragents.txt']:
         open(filename, 'a').close()
     os.makedirs('links', exist_ok=True)
 
+# Hitung baris file
+def count_file_lines(path):
+    try:
+        with open(path) as f:
+            return len([line for line in f if line.strip()])
+    except FileNotFoundError:
+        return 0
+
+# Hapus duplikat proxy valid
 def remove_duplicate_proxies():
     seen = set()
     proxies = []
@@ -26,13 +36,7 @@ def remove_duplicate_proxies():
             f.write(proxy + '\n')
     print(f"✅ Duplikat dihapus. Total unik: {len(proxies)} proxy.")
 
-def count_file_lines(path):
-    try:
-        with open(path) as f:
-            return len([line for line in f if line.strip()])
-    except FileNotFoundError:
-        return 0
-
+# Input shortlink satu per satu
 def input_links():
     print("🔗 Masukkan link shortlink satu per satu (DONE untuk selesai):")
     count = 1
@@ -52,6 +56,7 @@ def input_links():
             count += 1
     print("✅ Link berhasil disimpan.")
 
+# Jalankan klik otomatis
 def start_bot():
     all_links = []
     for file in os.listdir("links"):
@@ -63,20 +68,25 @@ def start_bot():
     else:
         print("❌ Tidak ada link ditemukan di folder /links")
 
-def show_summary():
-    total_raw = count_file_lines('proxies_raw.txt')
-    total_valid = count_file_lines('proxies_valid.txt')
-    try:
-        ip = requests.get('https://api.ipify.org', timeout=5).text.strip()
-    except:
-        ip = "Tidak terdeteksi"
-    duration = 0
-    show_banner(total_valid, total_raw, ip, duration)
-
+# Menu utama
 def menu():
     check_resources()
+
+    # Data awal untuk banner
+    ip = "-"
+    try:
+        ip = requests.get("https://api.ipify.org", timeout=5).text.strip()
+    except:
+        pass
+    valid = count_file_lines("proxies_valid.txt")
+    total = count_file_lines("proxies_raw.txt")
+    durasi = 0.0
+
+    os.system("clear")
+    show_banner(valid, total, ip, durasi)
+
     while True:
-        print("\n┌────────────────────────────┐")
+        print("┌────────────────────────────┐")
         print("│        🔧 PSK ENGINE        │")
         print("├────────────────────────────┤")
         print("│ 1. Scrape Proxy            │")
@@ -88,28 +98,43 @@ def menu():
         print("│ 0. Keluar                  │")
         print("└────────────────────────────┘")
         choice = input("Pilih menu: ").strip()
-        
+
         if choice == '1':
-            print("🔎 Scraping proxy...")
+            print("🔵 Scraping proxy...")
             scrape_proxies()
             print("✅ Scraping selesai.")
+            input("\nTekan ENTER untuk kembali ke menu...")
         elif choice == '2':
             remove_duplicate_proxies()
+            input("\nTekan ENTER untuk kembali ke menu...")
         elif choice == '3':
             print("🧪 Validasi proxy...")
             validate_all()
-            print("✅ Validasi selesai.")
+            input("\nTekan ENTER untuk kembali ke menu...")
         elif choice == '4':
             input_links()
+            input("\nTekan ENTER untuk kembali ke menu...")
         elif choice == '5':
             start_bot()
+            input("\nTekan ENTER untuk kembali ke menu...")
         elif choice == '6':
-            show_summary()
+            ip = "-"
+            try:
+                ip = requests.get("https://api.ipify.org", timeout=5).text.strip()
+            except:
+                pass
+            durasi = 0.0
+            valid = count_file_lines("proxies_valid.txt")
+            total = count_file_lines("proxies_raw.txt")
+            os.system("clear")
+            show_banner(valid, total, ip, durasi)
+            input("\nTekan ENTER untuk kembali ke menu...")
         elif choice == '0':
             print("👋 Keluar.")
             break
         else:
             print("❌ Pilihan tidak valid.")
+            input("\nTekan ENTER untuk kembali ke menu...")
 
 if __name__ == '__main__':
     menu()
